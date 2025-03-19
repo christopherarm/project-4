@@ -53,6 +53,9 @@ export const DatabaseProvider = ({ children }: DatabaseProviderProps) => {
         // Datenbank initialisieren
         await initDatabase();
 
+        // Datenbankschema wird bereits in initDatabase aktualisiert
+        // Doppelter Aufruf entfernt
+
         // Stelle sicher, dass der Benutzer bei Supabase authentifiziert ist
         await ensureAuthenticated();
 

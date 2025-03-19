@@ -1,20 +1,43 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { X, MapPin, Image as ImageIcon, Mic, Navigation } from 'lucide-react-native';
+import {
+  X,
+  MapPin,
+  Image as ImageIcon,
+  Mic,
+  Navigation,
+} from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { Entry } from '@/libs/models/Entry';
+import { useDatabase } from '@/libs/context/DatabaseContext';
 
 export default function NewEntryScreen() {
   const { id } = useLocalSearchParams();
+  const { isInitialized, syncData } = useDatabase();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [location, setLocation] = useState('');
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coordinates, setCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -24,7 +47,7 @@ export default function NewEntryScreen() {
     });
 
     if (!result.canceled) {
-      setImages([...images, ...result.assets.map(asset => asset.uri)]);
+      setImages([...images, ...result.assets.map((asset) => asset.uri)]);
     }
   };
 
@@ -33,13 +56,14 @@ export default function NewEntryScreen() {
       setIsGettingLocation(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Unable to access your location.');
         return;
       }
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High
+        accuracy: Location.Accuracy.High,
       });
-      
+
       const address = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -47,7 +71,9 @@ export default function NewEntryScreen() {
 
       if (address[0]) {
         const { city, region, country } = address[0];
-        const locationString = [city, region, country].filter(Boolean).join(', ');
+        const locationString = [city, region, country]
+          .filter(Boolean)
+          .join(', ');
         setLocation(locationString);
         setCoordinates({
           latitude: location.coords.latitude,
@@ -56,20 +82,92 @@ export default function NewEntryScreen() {
       }
     } catch (error) {
       console.error('Error getting location:', error);
+      Alert.alert('Error', 'Could not get your location. Please try again.');
     } finally {
       setIsGettingLocation(false);
+    }
+  };
+
+  const saveEntry = async () => {
+    if (!title.trim()) {
+      Alert.alert(
+        'Missing information',
+        'Please provide a title for your entry.'
+      );
+      return;
+    }
+
+    if (!isInitialized) {
+      Alert.alert('Database not ready', 'Please try again in a moment.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // Neuen Entry erstellen
+      const newEntry = new Entry();
+      newEntry.trip_id = id as string;
+      newEntry.title = title.trim();
+      newEntry.content = content.trim();
+      newEntry.location = location.trim();
+
+      if (coordinates) {
+        newEntry.latitude = coordinates.latitude;
+        newEntry.longitude = coordinates.longitude;
+      }
+
+      // Bilder-URLs als JSON-String in der images-Eigenschaft speichern
+      if (images.length > 0) {
+        newEntry.images = JSON.stringify(images);
+      }
+
+      // Entry in der Datenbank speichern
+      await newEntry.save();
+      console.log('Entry saved:', newEntry);
+
+      // Optional: Daten synchronisieren
+      try {
+        console.log('Starting synchronization after creating a new entry');
+        // Synchronisierung im Hintergrund starten, ohne auf Abschluss zu warten
+        syncData().catch((e) => console.log('Sync error:', e));
+      } catch (syncError) {
+        console.error('Error during sync:', syncError);
+      }
+
+      // Zurück zur Trip-Detail-Ansicht navigieren
+      router.back();
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      Alert.alert('Error', 'Could not save your entry. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeButton}
+        >
           <X size={24} color="#64748B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>New Entry</Text>
-        <TouchableOpacity style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>Save</Text>
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            (!title.trim() || isSaving) && styles.saveButtonDisabled,
+          ]}
+          onPress={saveEntry}
+          disabled={!title.trim() || isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -91,29 +189,36 @@ export default function NewEntryScreen() {
             value={location}
             onChangeText={setLocation}
           />
-          <TouchableOpacity 
-            onPress={getCurrentLocation} 
+          <TouchableOpacity
+            onPress={getCurrentLocation}
             style={[
               styles.getCurrentLocation,
-              isGettingLocation && styles.gettingLocation
-            ]}>
-            <Navigation size={16} color="#2563EB" style={isGettingLocation ? styles.rotating : undefined} />
+              isGettingLocation && styles.gettingLocation,
+            ]}
+          >
+            <Navigation
+              size={16}
+              color="#2563EB"
+              style={isGettingLocation ? styles.rotating : undefined}
+            />
             <Text style={styles.getCurrentLocationText}>
               {isGettingLocation ? 'Getting location...' : 'Current'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          style={styles.imageList}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.imageList}
+        >
           {images.map((uri, index) => (
             <View key={index} style={styles.imageContainer}>
               <Image source={{ uri }} style={styles.image} />
               <TouchableOpacity
                 style={styles.removeImage}
-                onPress={() => setImages(images.filter((_, i) => i !== index))}>
+                onPress={() => setImages(images.filter((_, i) => i !== index))}
+              >
                 <X size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
@@ -136,7 +241,8 @@ export default function NewEntryScreen() {
           />
           <TouchableOpacity
             style={[styles.micButton, isRecording && styles.micButtonRecording]}
-            onPress={() => setIsRecording(!isRecording)}>
+            onPress={() => setIsRecording(!isRecording)}
+          >
             <Mic size={24} color={isRecording ? '#FFFFFF' : '#2563EB'} />
           </TouchableOpacity>
         </View>
@@ -174,6 +280,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#94A3B8',
   },
   saveButtonText: {
     fontFamily: 'Nunito-SemiBold',

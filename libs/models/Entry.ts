@@ -11,6 +11,7 @@ export class Entry extends BaseModel {
   location?: string;
   latitude?: number;
   longitude?: number;
+  images?: string; // JSON-String mit Bild-URLs
 
   /**
    * Initialisiert ein neues Entry-Objekt
@@ -23,6 +24,7 @@ export class Entry extends BaseModel {
     this.location = data?.location;
     this.latitude = data?.latitude;
     this.longitude = data?.longitude;
+    this.images = data?.images;
   }
 
   /**
@@ -34,12 +36,12 @@ export class Entry extends BaseModel {
     await executeQuery(
       `INSERT INTO entries (
         id, trip_id, title, content, location, latitude, longitude,
-        created_at, updated_at, sync_status, deleted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_at, updated_at, sync_status, deleted, images
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.id, data.trip_id, data.title, data.content, data.location, 
         data.latitude, data.longitude, data.created_at, data.updated_at, 
-        data.sync_status, data.deleted
+        data.sync_status, data.deleted, data.images
       ]
     );
 
@@ -56,6 +58,7 @@ export class Entry extends BaseModel {
     if (newData.location !== undefined) this.location = newData.location;
     if (newData.latitude !== undefined) this.latitude = newData.latitude;
     if (newData.longitude !== undefined) this.longitude = newData.longitude;
+    if (newData.images !== undefined) this.images = newData.images;
     
     this.sync_status = 'pending';
     this.updateTimestamp();
@@ -65,11 +68,11 @@ export class Entry extends BaseModel {
     await executeQuery(
       `UPDATE entries SET 
         title = ?, content = ?, location = ?, latitude = ?, longitude = ?,
-        updated_at = ?, sync_status = ?
+        updated_at = ?, sync_status = ?, images = ?
       WHERE id = ?`,
       [
         data.title, data.content, data.location, data.latitude, data.longitude,
-        data.updated_at, data.sync_status, data.id
+        data.updated_at, data.sync_status, data.images, data.id
       ]
     );
 
