@@ -118,8 +118,8 @@ export class Trip extends BaseModel {
    */
   static async findUnsyncedTrips(): Promise<Trip[]> {
     const result = await executeQuery(
-      'SELECT * FROM trips WHERE sync_status = ? ORDER BY updated_at ASC',
-      ['pending']
+      'SELECT * FROM trips WHERE sync_status IN (?, ?) ORDER BY updated_at ASC',
+      ['pending', 'failed']
     );
     
     return result.rows.map(row => new Trip(row));

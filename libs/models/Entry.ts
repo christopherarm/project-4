@@ -124,8 +124,8 @@ export class Entry extends BaseModel {
    */
   static async findUnsyncedEntries(): Promise<Entry[]> {
     const result = await executeQuery(
-      'SELECT * FROM entries WHERE sync_status = ? ORDER BY updated_at ASC',
-      ['pending']
+      'SELECT * FROM entries WHERE sync_status IN (?, ?) ORDER BY updated_at ASC',
+      ['pending', 'failed']
     );
     
     return result.rows.map(row => new Entry(row));

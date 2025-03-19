@@ -18,6 +18,7 @@ import React, { useEffect, useState } from 'react';
 import { Trip } from '@/libs/models/Trip';
 import { Entry } from '@/libs/models/Entry';
 import { useDatabase } from '@/libs/context/DatabaseContext';
+import { executeQuery } from '@/libs/database/sqliteClient';
 
 export default function TripsScreen() {
   const { isInitialized, syncData, isSync, error } = useDatabase();
@@ -34,6 +35,7 @@ export default function TripsScreen() {
     if (!isInitialized) return;
 
     try {
+      setLoading(true);
       const testTrip = new Trip({
         title: 'Testtrip ' + new Date().toISOString().slice(11, 19),
         description: 'Ein Test für die SQLite Datenbank',
@@ -45,9 +47,19 @@ export default function TripsScreen() {
 
       await testTrip.save();
       console.log('Testtrip erstellt:', testTrip);
-      await loadTrips(); // Lade Trips neu
+
+      // Lade Trips neu
+      await loadTrips();
+
+      // Starte automatisch die Synchronisierung
+      console.log(
+        'Starte automatische Synchronisierung nach Trip-Erstellung...'
+      );
+      await handleSync();
     } catch (err) {
       console.error('Fehler beim Erstellen des Testtrips:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,18 +118,75 @@ export default function TripsScreen() {
     await loadTrips();
   };
 
+  // Funktion zum gezielten Aktualisieren des Sync-Status aller geladenen Trips
+  const refreshTripSyncStatus = async () => {
+    if (!isInitialized) return;
+
+    try {
+      // Für jeden Trip in der Ansicht den aktuellen Sync-Status aus der Datenbank laden
+      const updatedTrips = [];
+
+      for (const trip of trips) {
+        const result = await executeQuery(
+          'SELECT id, sync_status FROM trips WHERE id = ?',
+          [trip.id]
+        );
+
+        if (result.rows.length > 0) {
+          // Aktualisiere den Sync-Status im Trip-Objekt
+          trip.sync_status = result.rows[0].sync_status;
+          updatedTrips.push(trip);
+        }
+      }
+
+      // Setze die aktualisierten Trips
+      setTrips([...updatedTrips]);
+    } catch (err) {
+      console.error('Fehler beim Aktualisieren des Sync-Status:', err);
+    }
+  };
+
   // Manuell Synchronisieren mit Supabase
   const handleSync = async () => {
     if (isSync) return;
 
     try {
+      setLoading(true); // Zeige Ladeindikator während der Synchronisierung
+
       const result = await syncData();
+      console.log('Synchronisierungsergebnis:', result);
+
       if (result.success) {
-        // Wenn Synchronisierung erfolgreich, lade Daten neu
+        // Lade Daten komplett neu
         await loadTrips();
+
+        // Zeige Erfolgsbenachrichtigung
+        Alert.alert(
+          'Synchronisierung erfolgreich',
+          `${result.uploadedTrips || 0} Trips und ${
+            result.uploadedEntries || 0
+          } Einträge hochgeladen, ${result.downloadedTrips || 0} Trips und ${
+            result.downloadedEntries || 0
+          } Einträge heruntergeladen.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        // Zeige Fehlerbenachrichtigung
+        Alert.alert(
+          'Synchronisierungsfehler',
+          result.error || 'Unbekannter Fehler bei der Synchronisierung',
+          [{ text: 'OK' }]
+        );
       }
     } catch (err) {
       console.error('Synchronisierungsfehler:', err);
+      Alert.alert(
+        'Synchronisierungsfehler',
+        err instanceof Error ? err.message : 'Unbekannter Fehler',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
     }
   };
 

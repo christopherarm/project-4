@@ -1,4 +1,4 @@
-import { supabase } from '../../database/supabaseClient';
+import { supabase, ensureAuthenticated } from '../../database/supabaseClient';
 import { executeQuery } from '../../database/sqliteClient';
 import { Trip } from '../../models/Trip';
 import { Entry } from '../../models/Entry';
@@ -15,11 +15,33 @@ export class SyncManager {
    */
   static async syncAll(): Promise<SyncResult> {
     try {
+      // Stelle sicher, dass der Benutzer authentifiziert ist, bevor wir die Synchronisierung starten
+      const isAuthenticated = await ensureAuthenticated();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          error: 'Authentifizierung fehlgeschlagen'
+        };
+      }
+      
+      // Prüfe, ob die Supabase-Verbindung funktioniert
+      const connectionTest = await this.testSupabaseConnection();
+      if (!connectionTest.success) {
+        return {
+          success: false,
+          error: `Keine Verbindung zu Supabase: ${connectionTest.error}`
+        };
+      }
+      
+      console.log('Starte Synchronisierung mit Supabase...');
+      
       // Speichere lokale Änderungen in Supabase
       const uploadResult = await this.uploadLocalChanges();
+      console.log(`Upload abgeschlossen: ${uploadResult.trips} Trips, ${uploadResult.entries} Entries`);
       
       // Hole Änderungen von Supabase
       const downloadResult = await this.downloadRemoteChanges();
+      console.log(`Download abgeschlossen: ${downloadResult.trips} Trips, ${downloadResult.entries} Entries`);
       
       // Speichere den Zeitpunkt der letzten Synchronisierung
       await this.updateLastSyncTimestamp();
@@ -41,16 +63,42 @@ export class SyncManager {
   }
 
   /**
+   * Testet die Verbindung zum Supabase-Server
+   */
+  private static async testSupabaseConnection(): Promise<{success: boolean, error?: string}> {
+    try {
+      // Versuche eine einfache Abfrage an Supabase
+      const { error } = await supabase.from('trips').select('count', { count: 'exact', head: true });
+      
+      if (error) {
+        console.error('Supabase connection test failed:', error);
+        return { success: false, error: error.message };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Supabase connection test error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown connection error' 
+      };
+    }
+  }
+
+  /**
    * Lädt lokale Änderungen zu Supabase hoch
    */
   private static async uploadLocalChanges(): Promise<{ trips: number, entries: number }> {
     // Finde lokale Trips, die noch nicht synchronisiert wurden
     const unsyncedTrips = await Trip.findUnsyncedTrips();
+    console.log(`${unsyncedTrips.length} unsynced trips gefunden`);
     let uploadedTrips = 0;
     
     // Synchronisiere jeden Trip
     for (const trip of unsyncedTrips) {
       try {
+        console.log(`Synchronisiere Trip: ${trip.id} (${trip.title})`);
+        
         const tripData = {
           id: trip.id,
           title: trip.title,
@@ -59,48 +107,53 @@ export class SyncManager {
           end_date: trip.end_date,
           created_at: trip.created_at,
           updated_at: trip.updated_at,
-          deleted: trip.deleted
+          deleted: trip.deleted ? 1 : 0
         };
         
         // Lösche oder aktualisiere den Trip in Supabase
         if (trip.deleted) {
           // Soft Delete in Supabase
-          await supabase.from('trips')
+          const { error } = await supabase.from('trips')
             .update({ deleted: true, updated_at: trip.updated_at })
             .eq('id', trip.id);
+            
+          if (error) throw new Error(`Supabase update error: ${error.message}`);
+          console.log(`Trip ${trip.id} als gelöscht markiert`);
         } else {
           // Füge ein oder aktualisiere den Trip in Supabase
-          await supabase.from('trips')
+          const { error } = await supabase.from('trips')
             .upsert(tripData, { onConflict: 'id' });
+            
+          if (error) throw new Error(`Supabase upsert error: ${error.message}`);
+          console.log(`Trip ${trip.id} erfolgreich hochgeladen/aktualisiert`);
         }
         
         // Markiere den Trip als synchronisiert
-        trip.updateSyncStatus('synced');
-        const data = trip.prepareForDb();
         await executeQuery(
           'UPDATE trips SET sync_status = ? WHERE id = ?',
-          [data.sync_status, data.id]
+          ['synced', trip.id]
         );
         
         uploadedTrips++;
       } catch (error) {
         console.error(`Error syncing trip ${trip.id}:`, error);
-        trip.updateSyncStatus('failed');
-        const data = trip.prepareForDb();
         await executeQuery(
           'UPDATE trips SET sync_status = ? WHERE id = ?',
-          [data.sync_status, data.id]
+          ['failed', trip.id]
         );
       }
     }
     
     // Finde lokale Entries, die noch nicht synchronisiert wurden
     const unsyncedEntries = await Entry.findUnsyncedEntries();
+    console.log(`${unsyncedEntries.length} unsynced entries gefunden`);
     let uploadedEntries = 0;
     
     // Synchronisiere jeden Entry
     for (const entry of unsyncedEntries) {
       try {
+        console.log(`Synchronisiere Entry: ${entry.id} (${entry.title})`);
+        
         const entryData = {
           id: entry.id,
           trip_id: entry.trip_id,
@@ -111,37 +164,39 @@ export class SyncManager {
           longitude: entry.longitude,
           created_at: entry.created_at,
           updated_at: entry.updated_at,
-          deleted: entry.deleted
+          deleted: entry.deleted ? 1 : 0
         };
         
         // Lösche oder aktualisiere den Entry in Supabase
         if (entry.deleted) {
           // Soft Delete in Supabase
-          await supabase.from('entries')
+          const { error } = await supabase.from('entries')
             .update({ deleted: true, updated_at: entry.updated_at })
             .eq('id', entry.id);
+            
+          if (error) throw new Error(`Supabase update error: ${error.message}`);
+          console.log(`Entry ${entry.id} als gelöscht markiert`);
         } else {
           // Füge ein oder aktualisiere den Entry in Supabase
-          await supabase.from('entries')
+          const { error } = await supabase.from('entries')
             .upsert(entryData, { onConflict: 'id' });
+            
+          if (error) throw new Error(`Supabase upsert error: ${error.message}`);
+          console.log(`Entry ${entry.id} erfolgreich hochgeladen/aktualisiert`);
         }
         
         // Markiere den Entry als synchronisiert
-        entry.updateSyncStatus('synced');
-        const data = entry.prepareForDb();
         await executeQuery(
           'UPDATE entries SET sync_status = ? WHERE id = ?',
-          [data.sync_status, data.id]
+          ['synced', entry.id]
         );
         
         uploadedEntries++;
       } catch (error) {
         console.error(`Error syncing entry ${entry.id}:`, error);
-        entry.updateSyncStatus('failed');
-        const data = entry.prepareForDb();
         await executeQuery(
           'UPDATE entries SET sync_status = ? WHERE id = ?',
-          [data.sync_status, data.id]
+          ['failed', entry.id]
         );
       }
     }
@@ -155,6 +210,7 @@ export class SyncManager {
   private static async downloadRemoteChanges(): Promise<{ trips: number, entries: number }> {
     // Letzter Synchronisierungszeitpunkt
     const lastSync = await this.getLastSyncTimestamp();
+    console.log(`Hole Änderungen seit: ${lastSync || '1970-01-01'}`);
     let downloadedTrips = 0;
     let downloadedEntries = 0;
     
@@ -167,19 +223,29 @@ export class SyncManager {
     if (tripsError) {
       console.error('Error fetching remote trips:', tripsError);
     } else if (trips && trips.length > 0) {
+      console.log(`${trips.length} Trips von Supabase geladen`);
+      
       // Aktualisiere lokale Datenbank mit Remote-Trips
       for (const tripData of trips) {
         try {
-          // Prüfe, ob der Trip lokal existiert
-          const localTrip = await Trip.findById(tripData.id);
+          console.log(`Verarbeite Remote-Trip: ${tripData.id} (${tripData.title})`);
           
-          if (localTrip) {
-            // Prüfe, ob der lokale Trip geändert wurde und nicht synchronisiert ist
-            if (localTrip.sync_status === 'pending') {
-              // Lokale Änderungen haben Vorrang, überspringen
-              continue;
-            }
-            
+          // Prüfe, ob der Trip lokal existiert
+          const result = await executeQuery(
+            'SELECT id, sync_status FROM trips WHERE id = ?',
+            [tripData.id]
+          );
+          
+          const localTripExists = result.rows.length > 0;
+          const localSyncStatus = localTripExists ? result.rows[0].sync_status : null;
+          
+          // Bei lokalen Änderungen (pending) haben diese Vorrang
+          if (localTripExists && localSyncStatus === 'pending') {
+            console.log(`Trip ${tripData.id} hat lokale Änderungen, überspringe Update`);
+            continue;
+          }
+          
+          if (localTripExists) {
             // Aktualisiere lokalen Trip
             await executeQuery(
               `UPDATE trips SET 
@@ -191,6 +257,7 @@ export class SyncManager {
                 tripData.updated_at, 'synced', tripData.deleted ? 1 : 0, tripData.id
               ]
             );
+            console.log(`Trip ${tripData.id} lokal aktualisiert`);
           } else {
             // Füge neuen Trip hinzu
             await executeQuery(
@@ -203,6 +270,7 @@ export class SyncManager {
                 tripData.created_at, tripData.updated_at, 'synced', tripData.deleted ? 1 : 0
               ]
             );
+            console.log(`Neuer Trip ${tripData.id} lokal angelegt`);
           }
           
           downloadedTrips++;
@@ -210,6 +278,8 @@ export class SyncManager {
           console.error(`Error updating local trip ${tripData.id}:`, error);
         }
       }
+    } else {
+      console.log('Keine neuen Trips von Supabase zu laden');
     }
     
     // Hole aktualisierte Entries von Supabase
@@ -221,19 +291,29 @@ export class SyncManager {
     if (entriesError) {
       console.error('Error fetching remote entries:', entriesError);
     } else if (entries && entries.length > 0) {
+      console.log(`${entries.length} Entries von Supabase geladen`);
+      
       // Aktualisiere lokale Datenbank mit Remote-Entries
       for (const entryData of entries) {
         try {
-          // Prüfe, ob der Entry lokal existiert
-          const localEntry = await Entry.findById(entryData.id);
+          console.log(`Verarbeite Remote-Entry: ${entryData.id} (${entryData.title})`);
           
-          if (localEntry) {
-            // Prüfe, ob der lokale Entry geändert wurde und nicht synchronisiert ist
-            if (localEntry.sync_status === 'pending') {
-              // Lokale Änderungen haben Vorrang, überspringen
-              continue;
-            }
-            
+          // Prüfe, ob der Entry lokal existiert
+          const result = await executeQuery(
+            'SELECT id, sync_status FROM entries WHERE id = ?',
+            [entryData.id]
+          );
+          
+          const localEntryExists = result.rows.length > 0;
+          const localSyncStatus = localEntryExists ? result.rows[0].sync_status : null;
+          
+          // Bei lokalen Änderungen (pending) haben diese Vorrang
+          if (localEntryExists && localSyncStatus === 'pending') {
+            console.log(`Entry ${entryData.id} hat lokale Änderungen, überspringe Update`);
+            continue;
+          }
+          
+          if (localEntryExists) {
             // Aktualisiere lokalen Entry
             await executeQuery(
               `UPDATE entries SET 
@@ -247,6 +327,7 @@ export class SyncManager {
                 'synced', entryData.deleted ? 1 : 0, entryData.id
               ]
             );
+            console.log(`Entry ${entryData.id} lokal aktualisiert`);
           } else {
             // Füge neuen Entry hinzu
             await executeQuery(
@@ -255,11 +336,12 @@ export class SyncManager {
                 created_at, updated_at, sync_status, deleted
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
-                entryData.id, entryData.trip_id, entryData.title, entryData.content, 
+                entryData.id, entryData.trip_id, entryData.title, entryData.content,
                 entryData.location, entryData.latitude, entryData.longitude,
                 entryData.created_at, entryData.updated_at, 'synced', entryData.deleted ? 1 : 0
               ]
             );
+            console.log(`Neuer Entry ${entryData.id} lokal angelegt`);
           }
           
           downloadedEntries++;
@@ -267,16 +349,19 @@ export class SyncManager {
           console.error(`Error updating local entry ${entryData.id}:`, error);
         }
       }
+    } else {
+      console.log('Keine neuen Entries von Supabase zu laden');
     }
     
     return { trips: downloadedTrips, entries: downloadedEntries };
   }
 
   /**
-   * Speichert den Zeitpunkt der letzten Synchronisierung
+   * Aktualisiert den Zeitpunkt der letzten Synchronisierung
    */
   private static async updateLastSyncTimestamp(): Promise<void> {
     const now = new Date().toISOString();
+    console.log(`Setze letzten Sync-Zeitpunkt auf: ${now}`);
     await AsyncStorage.setItem(LAST_SYNC_KEY, now);
   }
 

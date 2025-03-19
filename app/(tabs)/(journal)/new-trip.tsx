@@ -20,7 +20,7 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { de } from 'date-fns/locale';
 
 export default function NewTripScreen() {
-  const { isInitialized } = useDatabase();
+  const { isInitialized, syncData } = useDatabase();
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -181,8 +181,28 @@ export default function NewTripScreen() {
 
       // Speichere in der Datenbank
       await newTrip.save();
+      console.log('Trip erfolgreich gespeichert:', newTrip.id);
 
-      // TODO: In einer realen App würden wir hier das Cover-Bild speichern
+      // Starte automatisch die Synchronisierung im Hintergrund
+      try {
+        console.log(
+          'Starte automatische Synchronisierung nach Trip-Erstellung...'
+        );
+        // Wir führen die Synchronisierung asynchron durch, ohne auf das Ergebnis zu warten,
+        // damit die Navigation nicht verzögert wird
+        syncData()
+          .then((result) => {
+            console.log('Automatische Synchronisierung abgeschlossen:', result);
+          })
+          .catch((syncError) => {
+            console.error(
+              'Fehler bei automatischer Synchronisierung:',
+              syncError
+            );
+          });
+      } catch (syncError) {
+        console.error('Fehler beim Starten der Synchronisierung:', syncError);
+      }
 
       // Navigiere zurück zur Trip-Liste
       router.replace('/(tabs)/(journal)');
