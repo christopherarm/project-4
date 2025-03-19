@@ -39,28 +39,46 @@ export default function AchievementsScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Achievements</Text>
-      </View>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {achievements.map((achievement) => (
-          <View key={achievement.id} style={styles.achievementCard}>
-            <View style={[styles.iconContainer, { backgroundColor: `${achievement.color}20` }]}>
-              <achievement.icon size={24} color={achievement.color} />
-            </View>
-            <View style={styles.achievementInfo}>
-              <Text style={styles.achievementTitle}>{achievement.title}</Text>
-              <Text style={styles.achievementDescription}>{achievement.description}</Text>
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { width: `${achievement.progress}%`, backgroundColor: achievement.color }]} />
+    <View style={styles.wrapper}>
+      <SafeAreaView edges={['top']} style={styles.topSafeArea} />
+      <SafeAreaView edges={['bottom']} style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Achievements</Text>
+        </View>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {achievements.map((achievement) => (
+            <View key={achievement.id} style={styles.achievementCard}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: `${achievement.color}20` },
+                ]}
+              >
+                <achievement.icon size={24} color={achievement.color} />
               </View>
-              <Text style={styles.progressText}>{achievement.progress}%</Text>
+              <View style={styles.achievementInfo}>
+                <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                <Text style={styles.achievementDescription}>
+                  {achievement.description}
+                </Text>
+                <View style={styles.progressContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${achievement.progress}%`,
+                        backgroundColor: achievement.color,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressText}>{achievement.progress}%</Text>
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -138,5 +156,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-SemiBold',
     fontSize: 12,
     color: '#64748B',
+  },
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  topSafeArea: {
+    backgroundColor: '#FFFFFF',
   },
 });

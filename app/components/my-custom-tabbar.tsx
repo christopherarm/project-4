@@ -10,12 +10,17 @@ import {
 } from 'react-native';
 import { Home, User, Trophy, MapPin } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const { width } = Dimensions.get('window');
 const TAB_BAR_WIDTH = width - 48;
 const TAB_WIDTH = TAB_BAR_WIDTH / 4;
 
-export default function MyCustomTabBar({ state, descriptors, navigation }) {
+export default function MyCustomTabBar({
+  state,
+  descriptors,
+  navigation,
+}: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const tabAnimatedValue = useRef(new Animated.Value(0)).current;
 

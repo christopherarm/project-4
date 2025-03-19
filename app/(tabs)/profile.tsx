@@ -1,4 +1,11 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings, MapPin, Flag } from 'lucide-react-native';
 
@@ -9,51 +16,63 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Settings size={24} color="#64748B" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.profileSection}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200' }}
-            style={styles.profileImage}
-          />
-          <Text style={styles.name}>Sarah Parker</Text>
-          <Text style={styles.bio}>Adventure seeker | Photography lover</Text>
+    <View style={styles.wrapper}>
+      <SafeAreaView edges={['top']} style={styles.topSafeArea} />
+      <SafeAreaView edges={['bottom']} style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Profile</Text>
+          <TouchableOpacity style={styles.settingsButton}>
+            <Settings size={24} color="#64748B" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.statsContainer}>
-          {stats.map((stat) => (
-            <View key={stat.id} style={styles.statCard}>
-              <stat.icon size={24} color="#2563EB" style={styles.statIcon} />
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.profileSection}>
+            <Image
+              source={{
+                uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200',
+              }}
+              style={styles.profileImage}
+            />
+            <Text style={styles.name}>Sarah Parker</Text>
+            <Text style={styles.bio}>Adventure seeker | Photography lover</Text>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Badges</Text>
-          <View style={styles.badgesGrid}>
-            {[1, 2, 3].map((badge) => (
-              <View key={badge} style={styles.badgeItem}>
-                <View style={styles.badge} />
-                <Text style={styles.badgeLabel}>Badge {badge}</Text>
+          <View style={styles.statsContainer}>
+            {stats.map((stat) => (
+              <View key={stat.id} style={styles.statCard}>
+                <stat.icon size={24} color="#2563EB" style={styles.statIcon} />
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Badges</Text>
+            <View style={styles.badgesGrid}>
+              {[1, 2, 3].map((badge) => (
+                <View key={badge} style={styles.badgeItem}>
+                  <View style={styles.badge} />
+                  <Text style={styles.badgeLabel}>Badge {badge}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  topSafeArea: {
+    backgroundColor: '#FFFFFF',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
