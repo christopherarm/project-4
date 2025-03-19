@@ -15,6 +15,9 @@
     "@expo/vector-icons": "^14.0.2",
     "@gorhom/bottom-sheet": "^4.6.0",
     "@lucide/lab": "^0.1.2",
+    "@react-native-async-storage/async-storage": "^2.1.2",
+    "@react-native-community/datetimepicker": "^8.3.0",
+    "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@supabase/supabase-js": "^2.39.3",
@@ -31,6 +34,7 @@
     "expo-router": "~4.0.19",
     "expo-speech": "~13.0.1",
     "expo-splash-screen": "^0.29.22",
+    "expo-sqlite": "^15.1.2",
     "expo-status-bar": "^2.0.1",
     "expo-symbols": "^0.2.2",
     "expo-system-ui": "^4.0.7",
@@ -40,19 +44,24 @@
     "react-dom": "18.3.1",
     "react-native": "^0.76.7",
     "react-native-animated-numbers": "^0.6.3",
+    "react-native-async-storage": "^0.0.1",
     "react-native-gesture-handler": "~2.20.2",
+    "react-native-get-random-values": "^1.11.0",
     "react-native-maps": "^1.18.0",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-reanimated": "~3.16.1",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
     "react-native-svg": "^15.8.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
-    "react-native-webview": "13.12.5"
+    "react-native-webview": "13.12.5",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~18.3.12",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.3.3"
   }
 }

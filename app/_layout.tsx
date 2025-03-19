@@ -13,6 +13,7 @@ import { SplashScreen } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { DatabaseProvider } from '@/libs/context/DatabaseContext';
 
 // Enable Reanimated to work with new architecture
 import 'react-native-reanimated';
@@ -39,13 +40,15 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <BottomSheetModalProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" options={{ title: 'Not Found' }} />
-        </Stack>
-        <StatusBar style="dark" />
-      </BottomSheetModalProvider>
+      <DatabaseProvider>
+        <BottomSheetModalProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" options={{ title: 'Not Found' }} />
+          </Stack>
+          <StatusBar style="dark" />
+        </BottomSheetModalProvider>
+      </DatabaseProvider>
     </GestureHandlerRootView>
   );
 }
